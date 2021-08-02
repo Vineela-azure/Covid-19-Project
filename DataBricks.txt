@@ -1,0 +1,15 @@
+1. Create service principle an secret with in the service principle
+2. Save application id, directory id, secret value
+3. Provide contributor access to service principle on data lake
+4. Create data bricks.
+5. create cluster in data bricks
+6. In databricks -> user setting -> generate token and save the token value
+7. Import mount script, execute it after updating data lake and service principle details in mounting script
+8. Import tranformation script
+9. Create pipeline in ADF
+	-> Add notebook activity
+	-> create linked service to azure data bricks,  use token value from step 6 suring creation of linked service
+	-> browse and select the tranformation script from databricks
+	-> debug the pipeline or if it is not working run the same in data bricks to have final output
+	-> or use the final output from covid19-main/processed/testing.csv from laptop
+

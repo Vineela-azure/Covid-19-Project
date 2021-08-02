@@ -1,0 +1,2 @@
+Create tables using script provided
+Create pipelines to copy data from processed folder in datalake to sql tables

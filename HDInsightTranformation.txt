@@ -1,0 +1,52 @@
+1. Create Managed Identity
+	-> Goto Portal and search for User Assigned Managed Identity
+	-> Name : covid19hdinsightidentity
+	-> Review and Create
+	-> Create 
+	
+2. Grant access to covid19hdinsightidentity on Datalake
+	-> Goto datalake in portal
+	-> Access Control (IAM) -> Add role assignment -> Assign Storage Blob Data Owner , select covid19hdinsightidentity -> save
+
+3. Create HDInsight Cluster
+	-> Make sure portal->Subscription -> Resource Providers -> HDInsight is registered before creating hdinsight cluster
+	-> Goto portal and search for "Azure HDInsight cluster"
+	-> Create
+	-> Name : covid19hdinsight
+	-> Region : EastUS (Make sure your datalake is also in the same region)
+	-> Cluster Type : Hadoop
+	-> username : vineela
+	-> password : Password@2021
+	-> Next
+	-> Primary Storage Type : Azure Data Lake Storage Gen 2
+	-> Primary Storage Account : covid19datalake7312021 (give datalake name here)
+	-> Filesystem : clear the contents and give "hdi-logs"
+	-> User Assigned Managed Identity : covid19hdinsightidentity
+	-> Additional Storage account : select Azure Blob Storage account created (covid19blob07302021)
+	-> Leave all defaults
+	-> Select appropriate configuration
+	-> Review and Create
+	
+4. Prepare ADLS folders according to the hql script and explain the script
+
+5. Data Factory -> Pipeline ->Add Hive -> 
+	-> Name : Processed Test Data
+	-> Create Linked service to HD Insight cluster
+		-> Name : ln_hdinsight_covidcluster
+		-> HDI Cluster : Select cluster from subscription
+		-> Azure Storage Linked service : select blob storage linked service
+		-> username : vineela
+		-> passwrod : Password@2021
+		-> Test connection
+		-> create
+	-> Script : select hql script from datalake scripts container
+	-> Trigger pipeline
+	-> Log File : SAS URI of stderr File
+	-> Walkthrough the steps completed.
+	-> Check output File : ADLS / Processed/ecdc/testing
+6. Open Ambari -> Select Hive view on top right corner -> Query and execue below query
+Select * from covid_reporting_processed.testing7. Check the output file datalake processed/testing folder
+	
+		
+	
+	

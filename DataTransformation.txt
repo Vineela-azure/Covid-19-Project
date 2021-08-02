@@ -1,0 +1,300 @@
+====================================================================================================================
+Cases and Deaths file transformation:
+--------------------------------------
+Pre-requisite: 
+----------------------------------------------------------------------------
+-> Upload below files to raw/ecdc folder from laptop:
+	1. cases_deaths_uk_ind_only.csv
+	2. cases_deaths.csv
+	3. country_response.csv
+	4. hospital_admissions.csv
+	5. testing.csv
+
+->Create containers in Datalake
+	1. lookup -> Add directory : ecdclookup -> upload lookup files : country_lookup.csv , dim_date.csv
+	2. processed 
+		-> Add directory : ecdc -> Add Directory : cases_deaths
+					-> Add Directory : hospitalization_admissions
+----------------------------------------------------------------------------
+
+1. Create source data set  (ds_cases_deaths_raw_csv_datalake)
+	-> Path : raw/ecdc/cases_deaths.csv
+	
+2. Create Processed container in datalake
+
+3. Create sink dataset (ds_cases_deaths_processed_csv_dl)
+	-> Path : container-> processed Folder-> ecdc/cases_deaths
+
+3. Create a Dataflow 
+	-> enable data flow debug 
+	-> Add source
+	-> open debug data settings beside debug -> select sample file and upload "cases_ecdc_uk_ind_only.csv"
+	-> Name : df_process_cases_deaths_csv
+
+4. Add Source in df_process_cases_deaths_csv 
+	-> Name Source as "RawCasesAndDeathsFile"
+	-> Projection : Detect data type
+	-> Optimise tab : Single partition
+
+5. Add Filter to "RawCasesAndDeathsFile" to filter only Europe Data
+	->Name : FilterEuropeDataOnly
+	->Expression : continent == 'Europe'  : Data Preview , Save and Finish
+	->Optmize : Single parition
+	-> Data preview
+	
+6. Add "Select" to "FilterEuropeDataOnly"
+	->Name : SelectRequiredColumns
+	->Select Setting : 
+		-> Remove "continent"
+		-> remove "rate_14_day"
+		-> rename "date" column to "reported_date"
+	-> Optimize : Single parition
+	-> Data Preview
+	
+7. Add Pivot to SelectRequiredColumns
+	-> Name : PivotIndicator_Count
+	-> Group by : country , country_code , population , reported_date , source
+	-> Pivot Key : Indicator , Value : confirmed cases , deaths
+	-> Pivoted columns : 
+		-> Column name pattern : prefix{Pivot key value}middle{expression prefix}suffix , _ in middle
+		-> Expression : Column name - count , expression : sum(daily_count)
+		-> Optimize : single partition
+		-> Data Preview
+
+8. Add Source 2 for lookup
+	-> Name : CountryLookup
+	-> New dataset -> ADLS2 -> Name: ds_country_lookup_csv_dl , path : lookup/ecdclookup/country_lookup.csv , First Row as a header : enable , Import schema from connection
+	-> Optimize : Single partition
+	-> Data Preview
+	
+9. Add Lookup to "PivotIndicator_Count"
+	-> Name : LookupCountryCode
+	-> Primary Stream : PivotIndicator_Count
+	-> Secondary Stream : CountryLookup
+	-> Lookup Conditions : country == country
+	-> Optimize : single parition
+	-> Data Preview
+
+10. Add select to "LookupCountryCode"
+	-> Name : SelectRequiredFields
+	-> Remove : country_code , Lookupcountry , Lookupcontinent, LookupPopulation
+	-> Rename : confirmed cases count to "cases_count"
+	-> Reorder columns : country , country_code_2_digit , country_code_3_digit , population , cases_count , deaths_count , reported_date , source
+	-> Optimize : single partition
+	-> Data PReview
+
+11. Add Sink to "SelectRequiredFields"
+	-> Name : CasesDeathsSink
+	-> Select dataset : ds_cases_deaths_processed_csv_dl
+	-> Settings : Check Clear the folder
+	-> Optimize : Single Partition
+	-> Data Preview
+
+12. Publish All
+
+13. Create New Pipeline
+	-> Name : pl_process_cases_deaths_csv
+	-> Add Data Flow
+		-> Name : ProcessCasesDeathsDF
+		-> Settings : dl_process_cases_deaths_csv
+		-> Valdiate
+		-> Debug
+		-> Click on specs in the pipeline to view the progress
+		
+14. Update Sink in "CasesDeathsSink"
+	-> Settings : FileName Option -> Output to single file : cases_deaths.csv
+	-> Data Preview
+	-> Publish all
+	
+15. Debug pipeline pl_process_cases_deaths_csv and check the processed / ecdc / cases_deaths / cases_deaths.csv
+		
+Cases and Deaths file transformation Complete	
+====================================================================================================================
+
+Hospital and Admissions File Tranformation
+------------------------------------------
+
+1. Create Source Data set "ds_raw_hospital_admissions_dl"
+	-> File PAth : raw / ecdc / hospital_admissions.csv
+	-> Click Ok
+	-> Publish
+
+2. Create Sink Data set "ds_process_hospital_admissions_dl"
+	-> File Path : processed / ecdc/hospital_admissions / hospital_admissions.csv
+	-> Import Schema : None
+	-> Publish
+
+3. Create Data Flow
+	-> Name : df_process_hospital_admissions_csv
+
+4. Add Source to df_process_hospital_admissions_csv
+	-> Name : RawHospitalAdmissionsCsv
+	-> Select ds_raw_hospital_admissions_dl
+	-> Projection : Detect data type
+	-> Optimize : Single partition
+	-> Data Preview
+
+5. Add Select to RawHospitalAdmissionsCsv
+	-> Name : SelectRequiredColumns
+	-> Remove URL
+	-> Rename "date" to "reported_date"
+	-> Rename "year_week" to "reported_year_week"
+	-> Optimize : Single partition
+	-> Data Preview
+
+6. Add another Source 
+	-> Name : CountryLookup
+	-> Dataset : select "ds_country_lookup_csv_dl"
+	-> Optimize : Single partition
+	-> Data Preview
+	
+7. Add Lookup to SelectRequiredColumns
+	-> Name : LookupCountryCode
+	-> Primary stream : SelectRequiredColumns
+	-> LookupStream : CountryLookup
+	-> Lookup conditions : country == country
+	-> Optimize : Single partition
+	-> Data Preview
+	
+8. Add Select to LookupCountryCode
+	-> Name : SelectRequiredFields
+	-> Remove : continent , Lookup country 
+	-> Reorder : bring country_code_2_digit, country_code_2_digit to be next to country
+
+9. Add Conditional Split to LookupCountryCode
+	-> Name : SplitDailyWeekly
+	-> Name 2 streams : Weekly , Daily
+	-> Weekly
+	Expression : indicator == 'Weekly new hospital admissions per 100K' || indicator == 'Weekly new ICU admissions per 100K'
+		Note : Take values from health_admissions.csv distict values in indicator column
+	-> Optimize : single partition
+	-> Data Preview both Weekly and Daily
+
+10. Add Another source for dim_date.csv
+	-> Name : DimDateLookup
+	-> Create New Data set
+		-> Name : ds_dim_date_looup
+		-> Path : lookup/ecdclookup/dim_date.csv
+		-> First Row Header : Check
+		-> Import schema from connection
+		-> Click ok
+		-> Test Connection
+		-> Open and Preview Data
+	-> Projection : Detect data type , change data type of year , week_of_year to string
+	-> Optimize : single partition
+	-> Data Preview
+	
+11. Add Derived Column to DimDateLookup
+	-> Name : DeriveYearWeek
+	-> New ColumnName : ecdc_year_week
+	-> Expression : year + '-W' + lpad(week_of_year,2,'0')
+	-> Save and finish
+	-> Optimize : single partition
+	-> Data Preview
+	
+12. Add Aggrgate tranformation to DeriveYearWeek
+	-> Name : AggregateStartEndWeekDates
+	-> Group By : ecdc_year_week
+	-> Aggregates : week_start_date , Exp : min(date) ; week_end_date , Exp : max(date)
+	-> Optimize : single partition
+	-> Data Preview
+	
+13. Add Join to "Weekly" (which is after SplitWeeklyDaily)
+	-> Name : JoinDateDim
+	-> Right Stream : Select AggregateStartEndWeekDates
+	-> Join : Inner
+	-> Join conditions : reported_eyar_week == ecdc_year_week
+	-> Data Preview
+
+14. Add Pivot to JoinDateDim
+	-> Name : PivotWeeklyHospitalIcuCount
+	-> Group By : country , country_code_2_digit , country_code_3_digit , population , reported_date , reported_year_week , week_start_date , week_end_date , source
+	-> Pivot Key : indicator , Values : 'Weekly new hospital admissions per 100K' , 'Weekly new ICU admissions per 100K'
+	-> Pivoted columns : 
+		-> Column name pattern : prefix{Pivot key value}middle{expression prefix}suffix , _ in middle
+		-> Expression : Column name - count , expression : sum(value)
+		-> Optimize : single partition
+		-> Data Preview 
+
+15. Add select to PivotWeeklyHospitalIcuCount
+	-> Name : SelectRequiredFields1
+	-> Rename : 
+		Weekly new hospital admissions per 100K_count to "new_hospital_occupancy_count"
+		Weekly new ICU admissions per 100K_count to "new_icu_occupancy_count"
+		week_start_date to "reported_week_start_date"
+		week_end_date to "reported_week_end_date"
+	-> Reorder according to Weekly requirement in slides.
+	-> Remove reported_date
+	-> Data Preview
+
+16. Add Sort to SelectRequiredFields1
+	-> SortWeeklyData
+	-> reported_year_week : descending
+	-> country : Ascending
+	
+17. Add Sink to SortWeeklyData
+	-> Name : SinkWeeklyData
+	-> Create New Data Set
+		-> Name : ds_processed_hospital_admissions_weekly
+		-> Path : processed/ecdc/hospital_admissions_weekly (note: create processed/ecdc/hospital_admissions_weekly in data lake if it not exists)
+		-> Import Schema : None
+		-> Click ok
+	
+18. Add Pivot to Daily
+	-> Name : PivotDailyCount
+	-> Group By : country , country_code_2_digit , country_code_3_digit , population , reported_date , reported_year_week , source
+	-> Pivot Key : indicator , Values : 'Daily hospital occupancy' , 'Daily ICU occupancy'
+	-> Pivoted columns : 
+		-> Column name pattern : prefix{Pivot key value}middle{expression prefix}suffix , _ in middle
+		-> Expression : Column name - count , expression : sum(value)
+		-> Optimize : single partition
+		-> Data Preview 
+
+19. Add select to PivotDailyCount
+	-> Name : SelectRequiredFields2
+	-> Rename : 
+		Daily hospital occupancy_count to "hospital_occupancy_count"
+		Daily ICU occupancy_count to "icu_occupancy_count"
+	-> Reorder according to Weekly requirement in slides.
+	-> Remove reported_year_week
+	-> Data Preview
+
+20. Add Sort to SelectRequiredFields2
+	-> SortDailyData
+	-> reported_date : Descending
+	-> country : Ascending.
+	
+21. Add Sink to SortDailyData
+	-> Name : SinkDailyData
+	-> Create New Data Set
+		-> Name : ds_processed_hospital_admissions_daily
+		-> Path : processed/ecdc/hospital_admissions_daily (note: create processed/ecdc/hospital_admissions_daily in data lake if it not exists)
+		-> Import Schema : None
+		-> Click ok
+22. Create Pipeline
+	-> Name : pl_process_hospital_admissions_data
+	-> Add DataFlow : select "df_process_hospital_admissions_csv"
+
+23. Validate , Publish all.
+
+24. Debug pl_process_hospital_admissions_data and view the pipeline run in monitor or click on spects.
+
+25. Update Sink in "SinkWeeklyData"
+	-> Settings : FileName Option -> Output to single file : hospital_admissions_weekly.csv
+	-> Settings : Check Clear the folder
+	-> Data Preview
+	-> Publish all
+
+26. Update Sink in "SinkDailyData"
+	-> Settings : FileName Option -> Output to single file : hospital_admissions_daily.csv
+	-> Settings : Check Clear the folder
+	-> Data Preview
+	-> Publish all
+
+27. Debug pipeline pl_process_hospital_admissions_data and check the 
+	processed/ecdc/hospital_admissions_weekly/hospital_admissions_weekly.csv
+	processed/ecdc/hospital_admissions_daily/hospital_admissions_daily.csv
+	
+Note : Open Data Flow and restart Debug if pipeline fails		
+
+====================================================================================================================

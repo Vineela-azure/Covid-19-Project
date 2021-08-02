@@ -1,0 +1,235 @@
+--------------------------------------------------------------------------------------------------- [[NEXT]]
+
+Data Ingestion [[NEXT]]
+
+Now we are going ingest population data by age into Azure datalake gen 2 from Azure blob storage. [[NEXT]]
+
+We are going to implement the highlighted part of the project architecture now. [[NEXT]]
+
+For this we have to create
+
+1. Copy activity
+2. Linked services
+3. Datasets
+4. Pipeline
+5. We will also explore Validate Activity
+6. If condition Activity
+7. Web Activity
+8. Get Metadata Activity
+9. Delete Activity
+10. Triggers used to schedule your pipeline [[NEXT]]
+
+Explain till Slide Handling Real world scenarios (Slide 39)
+
+---Demo in Azure portal by creating Copy activity and copy data using below naming conventions.
+
+1. ls_ablob_covidreportingsa
+2. ds_population_raw_gz
+3. ls_adls_covidreportingdl
+4. ds_population_raw_tsv
+5. pl_ingest_population_data
+6. Copy Population Data
+
+Steps:
+
+1. Upload population_by_age.tsv.gz Blob storage container
+
+Storage Account: covid19blob08022021
+Container: population
+File: population_by_age.tsv.gz
+
+2. Open Data Factory, create ls_ablob_covidreportingsa , ls_adls_covidreportingdl in Manage tab.
+
+3. Goto Author Tab in ADF, create dataset ds_population_raw_gz using ls_ablob_covidreportingsa
+	-> Select Compression type to gzip (.gz)
+	-> Column Delimiter to tab (\t)
+	-> preview data.                                                                                
+
+4. Create ds_population_raw_tsv using ls_adls_covidreportingdl, 
+	-> give filename as population_raw_tsv 
+	-> select schema import to none
+	-> Column Delimiter to tab (\t)
+
+5. Publish 2 datasets created so far
+
+6. Create Pipeline
+	-> Take copy activity and Name it : Copy Population Data
+	-> Name Pipeline to : pl_ingest_population_data
+	-> Update Source to ds_population_raw_gz, sink to ds_population_raw_tsv
+	-> Debug and see the file is moved to data lake successfully
+	
+[[NEXT]] Goto Handling Real World Scenarios slide [[NEXT]]
+
+Scenario 1 : Execute copy activity when file will be available
+-----------
+
+Goto portal :
+1. Pick Validation activity and add to pipeline
+2. Select ds_population_raw_gz dataset
+3. Timeout : 0.00:00:10
+4. Sleep : 5
+5. On success , attach the output to Copy Population Data Activity
+6. Delete below file
+	Storage Account: covid19blob08022021
+	Container: population
+	File: population_by_age.tsv.gz
+ 7. Debug the pipeline - Since the file is not present, it waits for 10 secs and gives a Timeout message.
+ 8. Pleace the file in 
+	Storage Account: covid19blob08022021
+	Container: population
+	File: population_by_age.tsv.gz
+9. Debug the pipeline. Check whether the file copied to datalake gen 2 after pipeline completes successfully.
+
+
+Scenario 2 : Execute Copy Activity only if file contents are as expected [[Next slide-41 in PPT]]
+-----------
+
+Goto portal :
+1. Pick Get Metadata Activity, NAme it as "Get Source Metadata" and select ds_population_raw_gz
+2. Field list -> New : Column Count , New : Size
+3. 
+
+
+Pick If else activity, Name it as "Source File Column Number Check"
+2. Expression : Functions -> Logical Functions -> equals -> select "Get Source Metadata" from Activities sections
+@equals(activity('Get Source metadata').output.columnCount,13)
+
+3. Right Click on "Copy Population Data" Activity -> Copy , Goto True edit button in If condition activity and Paste.
+
+4. Goto Pipeline and delete the "Copy Population Data" in pipeline and rename "Copy Population Data1" to "Copy Population Data" in true condition of if condition activity
+
+5. Publish the pipeline -> Validate all -> (Cleanup in datalake raw/Population directory ) -> debug the pipeline : wait for 30 secs
+
+6. Cleanup in datalake raw/Population directory -> Change the if condition expression to check for column count 14 and rerun the pipeline and show that copy activity is not run due to column count mismatch.
+
+7. If you want your pipeline to fail if the column count is mismatched , then you can use false portion of the if condition activity.
+
+8. Pick web activity -> cut in pipeline -> paste in if condition false activity.
+	->URL : https://www.dummy.com
+	->Method : POST
+	->Body: Dummy
+	
+9. Publish the pipeline -> Validate all -> Debug the pipeline -> Show the Pipeline failed due to mismatch in the source column count.
+
+10. Update column count in if condition activity expression to 13 and publish.
+
+11. Cleanup in datalake raw/Population directory, Debug the pipeline.
+
+Scenario 3 : Delete the source file on successful copy
+------------
+
+1. Pick delete activity to pipeline, Right click Delete activity -> cut -> goto if condition True, paste delete activity -> add line to Delete from Copy on success.
+
+2. Publish the pipeline -> Validate all -> Debug the pipeline
+
+Scheduling Pipeline Execution:
+-------------------------------
+1. Goto Pipeline -> Add Trigger -> Select New-> Tumbling Window -> Every 5 mins -> End date to next day -> Publish all.
+
+2. Upload population_by_age.tsv.gz Blob storage container
+
+Storage Account: covid19blob08022021
+Container: population
+File: population_by_age.tsv.gz
+
+3. Check the monitor after 5 mins-> Triggered Pipelines
+
+4. Delete the Trigger in Manage tab and Ingestion step 1 - copying data from blob to data lake gen 2 of our project is complete.
+
+Lets move on to Ingesting ECDC covid 19 data using http connector to data lake gen 2 account.
+
+=========================================================================================
+
+[[NEXT]]
+
+Explaint through slides 48, 49 , 50, 51 [[NEXT]]
+
+ECDC Data Overview - Open URL in Slide 52: We are interested in the files like
+
+1. Data on 14-day notification rate of new Covid-19 cases and deaths
+2. Data on hospital and ICU admission rates and current occupancy for covid 19
+3. Data on testing for covid-10 by week and country
+4. Data on country response measures to covid-19
+
+Right click and copy link address of all 4 datasets and paste it in notepad
+
+You can check the data dictionary for data file format.
+
+Explain slides from 52 to 58
+
+Goto Portal
+
+Naming conventions:
+ls_http_opendata_ecdc_europa_eu
+ds_cases_deaths_raw_csv_http
+ls_adls_covidreportingdl
+ds_cases_deaths_raw_csv_dl
+pl_ingest_cases_deaths_data
+Copy Cases And Deaths Data
+
+Steps:
+
+1. Create http linked service in manage tab "ls_http_opendata_ecdc_europa_eu"
+	-> base url : https://opendata.ecdc.europa.eu
+	-> Authentication Type : Anonymous
+	-> Test Connection
+	-> Create
+
+2. Create New dataset -> http -> text delimited
+	-> Name : ds_cases_deaths_raw_csv_http
+	-> Linked service : ls_http_opendata_ecdc_europa_eu
+	-> Create Parameter : RelativeURL (default value = /covid19/nationalcasedeath/csv/data.csv)
+	-> Relative path : Take RelativeURL Parameter value
+
+3. Create directory in data lake
+	-> Name : ecdc
+
+4. Create New dataset -> use datalake linkedservice
+	-> Name : ds_cases_deaths_raw_csv_dl
+	-> Path : raw/ecdc
+	-> Create Parameter : OutputFileName (default Value = cases_deaths.csv)
+	-> FileName : Take OutputFileName Parameter value
+
+5. Publish all , Validate All
+
+6. Create a pipeline "pl_ingest_cases_deaths_data"
+	-> Create paramters RelativeURL , OutputFileName, leave default values
+	-> Add Copy activity
+	-> Source : ds_cases_deaths_raw_csv_http [Preview]
+	-> Sink : ds_cases_deaths_raw_csv_dl
+
+7. Publish Pipeline
+
+8. Debug Pipeline with below parameters :
+	/covid19/nationalcasedeath/csv/data.csv
+	cases_deaths.csv
+
+9. Debug Pipeline with below parameters :
+	/covid19/hospitalicuadmissionrates/csv/data.csv
+	hospital_admissions.csv
+
+10. Update linked service ls_http_opendata_ecdc_europa_eu to have a parameter
+	-> Create parameter "URL" in ls_http_opendata_ecdc_europa_eu
+	-> Remove contents in the URL and use parameter in ls_http_opendata_ecdc_europa_eu.
+	-> Create parameter "URL" in ds_cases_deaths_raw_csv_http
+	-> Remove contents in the URL and use parameter in ds_cases_deaths_raw_csv_http.
+	-> Add URL parameter in Pipeline and pass the same to this ds_cases_deaths_raw_csv_http
+	-> Publish all 3 -> pl_ingest_cases_deaths_data, ls_http_opendata_ecdc_europa_eu , ds_cases_deaths_raw_csv_http
+	
+11. Debug Pipeline with below parameters :
+	URL : https://opendata.ecdc.europa.eu
+	RelativeURL : /covid19/testing/csv
+	FileName : testing.csv
+	
+12. Debug Pipeline with below parameters :
+	URL : https://www.ecdc.europa.eu
+	RelativeURL : /sites/default/files/documents/data_response_graphs_0.csv
+	FileName : country_response.csv
+	
+Since there are changes in file formats in these http sites, replace data lake 4 files to have them from laptop
+All the scripts used , table formats that I have are with these old files.
+Data Ingestion part is complete.
+
+
+
+
