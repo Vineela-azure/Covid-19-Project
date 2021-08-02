@@ -1,0 +1,10 @@
+https://opendata.ecdc.europa.eu/covid19/nationalcasedeath/csv/data.csv
+
+https://opendata.ecdc.europa.eu/covid19/hospitalicuadmissionrates/csv/data.csv
+
+https://opendata.ecdc.europa.eu/covid19/testing/csv/data.csv
+
+https://www.ecdc.europa.eu/sites/default/files/documents/response_graphs_data_2021-07-28.csv
+
+
+
