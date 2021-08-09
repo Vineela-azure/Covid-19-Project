@@ -1,4 +1,6 @@
-Create tables using script provided
-Create pipelines to copy data from processed folder in datalake to sql tables
-Source Filew for SQL Load : covid19-main\covid19-main\processed
+
+#Create tables using script provided
 Target Tables can be created using : covid19-main\covid19-main\sql_scripts\create_covid_tables_ddl.sql
+
+#Create pipelines to copy data from processed folder in datalake to sql tables
+Source Files for SQL Load are available at : covid19-main\covid19-main\processed
