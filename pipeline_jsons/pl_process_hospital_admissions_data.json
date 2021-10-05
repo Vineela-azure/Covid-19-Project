@@ -1,0 +1,37 @@
+{
+    "name": "pl_process_hospital_admissions_data",
+    "properties": {
+        "activities": [
+            {
+                "name": "df_process_hospital_admissions_csv",
+                "type": "ExecuteDataFlow",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "1.00:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "dataflow": {
+                        "referenceName": "df_process_hospital_admissions_csv",
+                        "type": "DataFlowReference"
+                    },
+                    "compute": {
+                        "coreCount": 8,
+                        "computeType": "General"
+                    },
+                    "traceLevel": "Fine"
+                }
+            }
+        ],
+        "folder": {
+            "name": "Vineela"
+        },
+        "annotations": [],
+        "lastPublishTime": "2021-10-04T10:29:55Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

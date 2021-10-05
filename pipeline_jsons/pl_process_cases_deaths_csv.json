@@ -1,0 +1,37 @@
+{
+    "name": "pl_process_cases_deaths_csv",
+    "properties": {
+        "activities": [
+            {
+                "name": "ProcessCasesDeathsDF",
+                "type": "ExecuteDataFlow",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "1.00:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "dataflow": {
+                        "referenceName": "df_process_cases_deaths_csv",
+                        "type": "DataFlowReference"
+                    },
+                    "compute": {
+                        "coreCount": 8,
+                        "computeType": "General"
+                    },
+                    "traceLevel": "Fine"
+                }
+            }
+        ],
+        "folder": {
+            "name": "Vineela"
+        },
+        "annotations": [],
+        "lastPublishTime": "2021-10-04T08:44:03Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}
